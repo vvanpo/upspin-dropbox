@@ -14,8 +14,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"golang.org/x/oauth2"
-
+	"dropbox.upspin.io/oauth2"
 	"upspin.io/subcmd"
 )
 
@@ -33,7 +32,7 @@ the specified authorization code to access your Dropbox.
 
 Before running this command, you must obtain an authorization code:
 
-1. Go to https://www.dropbox.com/oauth2/authorize?client_id=wt1281n3q768jj3&response_type=code
+1. Go to https://www.dropbox.com/oauth2/authorize?client_id=wt1281n3q768jj3&response_type=code&token_access_type=offline
 2. Click "Allow" (you might have to log in first).
 3. Copy the authorization code
 4. Run setupstorage-dropbox -domain <domain.tld> <authorization_code>
@@ -65,32 +64,18 @@ func main() {
 
 	cfgPath := filepath.Join(*where, *domain)
 	cfg := s.ReadServerConfig(cfgPath)
+	token, err := oauth2.Exchange(authCode)
+	if err != nil {
+		s.Exit(err)
+	}
 
 	cfg.StoreConfig = []string{
 		"backend=Dropbox",
-		"token=" + s.token(authCode),
+		"refresh_token=" + token,
 	}
 	s.WriteServerConfig(cfgPath, cfg)
 
 	fmt.Fprintf(os.Stderr, "You should now deploy the upspinserver binary and run 'upspin setupserver'.\n")
 
 	s.ExitNow()
-}
-
-func (s *state) token(code string) string {
-	conf := &oauth2.Config{
-		ClientID:     "wt1281n3q768jj3",
-		ClientSecret: "blk944sx4oyf6aq",
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://www.dropbox.com/oauth2/authorize",
-			TokenURL: "https://api.dropboxapi.com/oauth2/token",
-		},
-	}
-
-	token, err := conf.Exchange(oauth2.NoContext, code)
-	if err != nil {
-		s.Exit(err)
-	}
-
-	return token.AccessToken
 }

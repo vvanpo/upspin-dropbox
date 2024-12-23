@@ -14,27 +14,22 @@ import (
 	"net/http"
 	"strings"
 
+	"dropbox.upspin.io/oauth2"
 	"upspin.io/cloud/storage"
 	"upspin.io/errors"
 	"upspin.io/upspin"
 )
 
-// apiToken is the key for the dial options in the storage.Storage interface.
-const apiToken = "token"
-
 // New initializes a Storage implementation that stores data to Dropbox.
 func New(opts *storage.Opts) (storage.Storage, error) {
 	const op errors.Op = "cloud/storage/dropbox.New"
 
-	tok, ok := opts.Opts[apiToken]
+	token, ok := opts.Opts["refresh_token"]
 	if !ok {
-		return nil, errors.E(op, errors.Invalid, errors.Errorf("%q option is required", apiToken))
+		return nil, errors.E(op, errors.Invalid, errors.Errorf("refresh_token option is required"))
 	}
 
-	return &dropboxImpl{
-		client: http.DefaultClient,
-		token:  tok,
-	}, nil
+	return &dropboxImpl{oauth2.Client(token)}, nil
 }
 
 func init() {
@@ -44,7 +39,6 @@ func init() {
 // dropboxImpl is an implementation of Storage that connects to a Dropbox backend.
 type dropboxImpl struct {
 	client *http.Client
-	token  string
 }
 
 var (
@@ -216,7 +210,6 @@ func (d *dropboxImpl) newRequest(path string, body io.Reader, arg string) (*http
 		return nil, err
 	}
 
-	req.Header.Add("Authorization", "Bearer "+d.token)
 	req.Header.Add("Content-Type", "application/octet-stream")
 
 	if arg != "" {

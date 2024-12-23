@@ -16,6 +16,7 @@ import (
 
 	"golang.org/x/oauth2"
 
+	dboauth2 "dropbox.upspin.io/oauth2"
 	"upspin.io/cloud/storage"
 	"upspin.io/upspin"
 )
@@ -29,6 +30,17 @@ var (
 	authCode   = flag.String("code", "", "dropbox authentication code")
 	useDropbox = flag.Bool("use_dropbox", false, "enable to run dropbox tests; requires authentication code")
 )
+
+func init() {
+	dboauth2.Config = &oauth2.Config{
+		ClientID:     "ufhy41x7g4obzqz",
+		ClientSecret: "vuhgmucmxm93dp5",
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  "https://www.dropbox.com/oauth2/authorize",
+			TokenURL: "https://api.dropboxapi.com/oauth2/token",
+		},
+	}
+}
 
 func TestList(t *testing.T) {
 	ls, ok := client.(storage.Lister)
@@ -139,7 +151,7 @@ func TestMain(m *testing.M) {
 cloud/storage/dropbox: skipping test as it requires Dropbox access. To enable this test,
 on the first run get an authentication code by visiting:
 
-https://www.dropbox.com/oauth2/authorize?client_id=ufhy41x7g4obzqz&response_type=code
+https://www.dropbox.com/oauth2/authorize?client_id=ufhy41x7g4obzqz&response_type=code&token_access_type=offline
 
 Copy the code and pass it by the -code flag. This will get an oAuth2 access token, store
 it and reuse it in successive test calls.
@@ -155,7 +167,7 @@ it and reuse it in successive test calls.
 
 	// Create client that writes to your Dropbox.
 	client, err = storage.Dial("Dropbox",
-		storage.WithKeyValue("token", t))
+		storage.WithKeyValue("refresh_token", t))
 	if err != nil {
 		log.Fatalf("cloud/storage/dropbox: couldn't set up client: %v", err)
 	}
@@ -173,23 +185,14 @@ func token() (string, error) {
 		return string(token), nil
 	}
 
-	conf := &oauth2.Config{
-		ClientID:     "ufhy41x7g4obzqz",
-		ClientSecret: "vuhgmucmxm93dp5",
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://www.dropbox.com/oauth2/authorize",
-			TokenURL: "https://api.dropboxapi.com/oauth2/token",
-		},
-	}
-
-	tok, err := conf.Exchange(oauth2.NoContext, *authCode)
+	tok, err := dboauth2.Exchange(*authCode)
 	if err != nil {
 		return "", err
 	}
 
-	if err := ioutil.WriteFile(tokenFile, []byte(tok.AccessToken), 0600); err != nil {
+	if err := ioutil.WriteFile(tokenFile, []byte(tok), 0600); err != nil {
 		return "", err
 	}
 
-	return tok.AccessToken, nil
+	return tok, nil
 }
